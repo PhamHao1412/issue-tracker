@@ -201,6 +201,30 @@ func runJob(cfg *Config, roundIndex *int, prices []int) {
 
 // ---- Main ----
 
+//func main() {
+//	cfg := loadConfig()
+//
+//	prices := make([]int, len(cfg.Products))
+//	for i := range prices {
+//		prices[i] = 3001
+//	}
+//	roundIndex := 0
+//
+//	log.Printf("🚀 Started — user: %s | %d products | interval: %s",
+//		cfg.Username, len(cfg.Products), cfg.Interval)
+//
+//	runJob(cfg, &roundIndex, prices)
+//
+//	ticker := time.NewTicker(cfg.Interval)
+//	defer ticker.Stop()
+//
+//	for range ticker.C {
+//		runJob(cfg, &roundIndex, prices)
+//	}
+//}
+
+// ---- Main ----
+
 func main() {
 	cfg := loadConfig()
 
@@ -210,15 +234,30 @@ func main() {
 	}
 	roundIndex := 0
 
-	log.Printf("🚀 Started — user: %s | %d products | interval: %s",
-		cfg.Username, len(cfg.Products), cfg.Interval)
+	log.Printf("🚀 Started — user: %s | %d products | Đã chuyển giao lịch chạy cho cron-job.org", cfg.Username, len(cfg.Products))
 
-	runJob(cfg, &roundIndex, prices)
+	// 1. Mỗi lần thằng cron-job.org gõ cửa (ping), hàm này sẽ kích hoạt NGAY LẬP TỨC
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-	ticker := time.NewTicker(cfg.Interval)
-	defer ticker.Stop()
-
-	for range ticker.C {
+		// Chạy cái job quét sản phẩm của bạn
 		runJob(cfg, &roundIndex, prices)
+
+		// Trả lời cho cron-job.org biết là đã chạy xong xuôi
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Job executed successfully at: %s", time.Now().String())
+	})
+
+	// 2. Mở cổng mạng để Render cấp link
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("🌐 HTTP Server đang chờ cron-job.org tại cổng: %s", port)
+
+	// 3. Treo server ở đây để chờ nhận ping
+	err := http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		log.Fatalf("❌ Lỗi Server: %v", err)
 	}
 }
